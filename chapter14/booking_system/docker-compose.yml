@@ -1,0 +1,62 @@
+version: "3.9"
+networks:
+  # 指定网络名称
+  zyx-txnet:
+    # 指定网络模式是桥接的模式
+    driver: bridge
+services:
+  postgres_db:
+    image: postgres:14.1-alpine
+    # 指定使用网络
+    networks:
+      - zyx-txnet
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: booking_system
+      POSTGRES_HOST: postgres_db
+    volumes:
+      - /data/fastapi_pg/pgdata:/var/lib/posgresql/data/
+    ports:
+      - "5435:5432"
+    restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  fastapi_api_service:
+    build: .
+    # 指定使用网络
+    networks:
+      - zyx-txnet
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: 123456
+      DB_NAME: booking_system
+      DB_HOST: postgres_db
+    command: [sh, -c, "uvicorn main:app --host 0.0.0.0 --port 8000"]
+    ports:
+      - "8005:8000"
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+  rabbit:
+    image: rabbitmq:3-management-alpine
+    # 指定使用网络
+    networks:
+      - zyx-txnet
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - /data/fastapi_rabbitmq/rabbitmqdata:/var/lib/rabbitmq
+    ports:
+      - 5675:5672
+      - 15675:15672
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "5672" ]
+      interval: 5s
+      timeout: 15s
+      retries: 1
+ 

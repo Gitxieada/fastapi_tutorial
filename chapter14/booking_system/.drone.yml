@@ -1,0 +1,55 @@
+kind: pipeline # 定义对象类型，还有secret和signature两种类型
+type: docker # 定义流水线类型，还有kubernetes、exec、ssh等类型
+name: 挂号预约系统部署 # 定义流水线名称
+
+# 自订购克隆工作区路径-仅是临时的工作区，执行完成流水线后会自动的进行关闭
+workspace:
+  path: /drone/src
+
+steps: # 定义流水线执行步骤，这些步骤将顺序执行
+  # 将当前拉取下来的工作区内（克隆下来的）的文件，转移到宿主机上
+  - name: code-scp
+    image: appleboy/drone-scp
+    settings:
+      host: 192.168.126.132 # 远程连接地址
+      username: root # 远程连接账号
+      password: 
+         from_secret: ssh_password
+      port: 22 # 远程连接端口
+      # 转移到宿主机的某个目录下
+      target: /data/www/booking_system
+      # 拷贝当前工作区内的相关的所有文件（git拉取下来的项目文件）
+      source: .
+
+  # 部署项目
+  - name: code-deploy
+    image: appleboy/drone-ssh # 链接宿主机的SSH插件镜像
+    settings:
+      host: 192.168.126.132 # 远程连接地址
+      username: root # 远程连接账号
+      password: 
+        from_secret: ssh_password
+      port: 22 # 远程连接端口
+      # 相关的命令的执行
+      script:
+        - cd /data/www/booking_system
+        # 每次发布更新代码都需要重新构建新的镜像！因为我们的代码是复制到镜像里面去的！
+        #- docker-compose stop && echo y | docker-compose rm && docker rmi fatest_api:latest
+        - docker-compose stop && docker-compose up -d --build
+        # 不要这样写！- docker-compose up --build && docker-compose up -d
+         
+  - name: notify
+    image: drillster/drone-email
+    settings:
+      host: smtp.qq.com      # 例如 smtp.qq.com
+      port: 465  #  例如QQ邮箱端口465
+      username: 308711822@qq.com  # 邮箱用户名
+      password: 
+        from_secret: qq_password  # 邮箱密码22邮箱授权码
+      subject: "Drone build: [{{ build.status }}] {{ repo.name }} ({{ repo.branch }}) #{{ build.number }}"
+      from: 308711822@qq.com
+      skip_verify: true
+      recipients_only: true  # 只发送给指定邮件收件人，不默认发送给流水线创建人；
+      recipients: [ 308711822@qq.com]
+    when: # 执行条件
+      status: [ changed, failure, success]

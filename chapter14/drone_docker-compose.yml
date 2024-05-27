@@ -1,0 +1,89 @@
+version: '3'
+services:
+  gogs:
+    image: gogs/gogs:latest
+    container_name: gogs
+    ports:
+      - "3000:3000"
+      - "10022:22"
+    volumes:
+      - /data/fastapi_drone/gogs:/data
+
+  gogspgdb:
+    image: "postgres:9.4"
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: gogs
+    ports:
+      - '5566:5432'
+    volumes:
+      - /data/fastapi_drone/pgdata:/var/lib/postgresql/data
+
+  drone-server:
+    image: drone/drone:latest
+    container_name: drone-server
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - /data/fastapi_drone/drone:/var/lib/drone/
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+    environment:
+      - DRONE_DEBUG=true
+      # 启动日志，默认是关闭的
+      - DRONE_LOGS_TRACE=true
+      - DRONE_AGENTS_ENABLED=true
+      - DRONE_SERVER_HOST=192.168.126.130:8080
+      - DRONE_RPC_PROTO=http
+      # 启动 debug 日志，默认是关闭的
+      - DRONE_LOGS_DEBUG=true
+      - DRONE_OPEN=true
+      # 设置 drone-server 使用的 host 名称，可以是 ip 地址加端口号；容器中可以使用容器名称代替
+      # - DRONE_SERVER_HOST=drone-server
+      - DRONE_GIT_ALWAYS_AUTH=false
+      # 开启 gogs
+      - DRONE_GOGS=true
+      - DRONE_GOGS_SKIP_VERIFY=false
+      # gogs 服务地址，使用容器名 + 端口号
+      - DRONE_GOGS_SERVER=http://gogs:3000
+      # drone 的提供者，本项目中为 gogs 服务
+      - DRONE_PROVIDER=gogs
+      # 配置 drone 数据库
+      - DRONE_DATABASE_DRIVER=sqlite3
+      # 配置 drone 数据库文件
+      - DRONE_DATABASE_DATASOURCE=/var/lib/drone/drone.sqlite
+      # 协议，可选 http、https
+      - DRONE_SERVER_PROTO=http
+      # 秘钥，用于 drone-server 与 drone-agent 之间的 RPC 请求
+      - DRONE_RPC_SECRET=xiaozhong
+      # 秘钥，用于 drone-server 与 drone-agent 直接的请求
+      - DRONE_SECRET=xiaozhong
+      #  这行非常关键，加上之后，使用 yourUsername 用户名登录 drone 便成为了管理员，如果不加，则看不到Trusted那个按钮，也可以修改数据库！
+      - DRONE_USER_CREATE=username:zyx308711822,admin:true
+
+  drone-agent:
+    image: drone/agent:latest
+    container_name: drone-agent
+    depends_on:
+      - drone-server
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+    environment:
+      - DRONE_DEBUG=true
+      # 启动日志，默认是关闭的
+      - DRONE_LOGS_TRACE=true
+      # 启动 debug 日志，默认是关闭的
+      - DRONE_LOGS_DEBUG=true
+      # 设置 drone-server 使用的 host 名称，可以是 ip 地址加端口号；容器中可以使用容器名称代替
+      - DRONE_RPC_SERVER=http://drone-server
+      # 秘钥，用于 drone-server 与 drone-agent 之间的 RPC 请求
+      - DRONE_RPC_SECRET=xiaozhong
+      - DRONE_SERVER=drone-server:9000
+      # 秘钥，用于 drone-server 与 drone-agent 直接的请求
+      - DRONE_SECRET=xiaozhong
+      - DRONE_MAX_PROCS=5
+      #   - DOCKER_HOST=tcp://127.0.0.1:2375

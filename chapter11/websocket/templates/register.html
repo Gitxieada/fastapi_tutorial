@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="utf-8">
+            <title>聊天室房间用户注册</title>
+        </head>
+        <body>
+        <form action="/api/v1/user/register_action" method="get" onsubmit="return check(this)">
+            用户名称: <input type="text" name="username"><br>
+            用户号码: <input type="text" name="phone_number"><br>
+            用户密码: <input type="text" name="password"><br>
+            <input type="submit" value="注册账号" onclick="check(this.form)">
+        </form>
+        </body>
+
+        <script type="text/javascript">
+         function check(form) {
+              if(form.username.value=='') {
+                    alert("请输入用户名称!");
+                    form.username.focus();
+                    return false;
+               }
+              if(form.phone_number.value=='') {
+                    alert("请输入用户号码!");
+                    form.phone_number.focus();
+                    return false;
+               }
+               if(form.password.value==''){
+                    alert("请输入用户密码!");
+                    form.password.focus();
+                    return false;
+                }
+                return true;
+              }
+        </script>
+
+    </html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>FastAPI Websocket 简易聊天室案例</title>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <style>
+        .userlistbox {
+            overflow-y: scroll;
+        }
+        .userchatbox {
+            overflow-y: scroll;
+            height: 50rem;
+        }
+        .sendmsgtools {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+<div id="app" class="panel panel-default">
+    <div class="panel-body">
+        {{title}}
+    </div>
+    <div class="panel-footer">
+        <div  class="container">
+            <div class="row">
+                <div class="col-md-3 userlistbox" style="background-color: #dedef8;
+                 box-shadow: inset 1px -1px 1px #444, inset -1px 1px 1px #444;">
+                    <h4>在线用户</h4>
+                    <ul>
+                        <li v-for="username in users" :key="username">用户：{{username}}</li>
+                    </ul>
+                </div>
+                <div class="col-md-9 " style="background-color: #20c997;
+                 box-shadow: inset 1px -1px 1px #444,
+                 inset -1px 1px 1px #444;">
+                    <h4>聊天室</h4>
+                    <div class="userchatbox">
+                        <div>
+                            <li style="color:#FFF" v-for="(msg,index) in messages" :key="msg">{{msg}}</li>
+                        </div>
+                    </div>
+                    <form class="sendmsgtools">
+                        <div class="form-group row">
+                            <div class="col-lg-11">
+                                <div class="input-group" style="background-color: ##007bff;
+                 box-shadow: inset 1px -1px 1px #444,
+                 inset -1px 1px 1px #444;">
+
+                                    <span class="input-group-addon">消息内容：</span>
+                                    <input type="text" class="form-control" v-model='sendmsg'>
+                                    <span class="input-group-btn">
+                                    <button class="btn btn-default" type="button" @click="send">
+                                        发送
+                                    </button>
+					                </span>
+                                </div><!-- /input-group -->
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+       var app = new Vue({
+        el: '#app',
+        data: {
+            title:"FastAPI Websocket 简易聊天室案例",
+            wsurl:"ws://127.0.0.1:8000/api/v1/room/socketws",
+            socket:"",
+            messages: [],
+            users:[],
+            sendmsg:"",
+        },
+        mounted () {
+        // 初始化
+        this.initSocket()
+        },
+        methods: {
+           initSocket: function () {
+            if(typeof(WebSocket) === "undefined"){
+                alert("您的浏览器不支持socket")
+            }else{
+                // 实例化socket并链接到服务端的WebSocket
+                this.wsurl = this.wsurl+window.location.search
+                this.socket = new WebSocket(this.wsurl)
+                // 监听socket连接
+                this.socket.onopen = this.open
+                // 监听socket错误信息
+                this.socket.onerror = this.error
+                // 监听socket消息
+                this.socket.onmessage = this.getMessage
+            }
+        },
+        open: function () {
+            console.log("socket连接成功")
+
+        },
+        error: function () {
+            console.log("连接错误")
+        },
+        getMessage: function (msg) {
+            var obj = JSON.parse(msg.data)
+               if(obj.type==="system_room_update_userlist"){
+                this.users= obj.data.users_list
+               }
+               else if(obj.type==="system_msg_user_login"){
+               this.addSystemMessage(obj.type,obj.data)
+               }
+               else if(obj.type==="system_msg_user_logout"){
+                this.users.splice(this.users.indexOf(obj.data), 1)
+                this.addSystemMessage(obj.type,obj.data)
+               }
+               else if(obj.type==="user_send_msg"){
+                this.addChatMessage(obj.data.username,obj.data.msg,obj.data.datetime)
+               }
+                console.log( this.users)
+        },
+        send: function () {
+
+            if(this.sendmsg==""||this.sendmsg==null||this.sendmsg==undefined){
+                 console.log("发送的消息不能为空！")
+                return
+            }
+            this.socket.send(this.sendmsg)
+            this.sendmsg=""
+
+
+        },
+        close: function () {
+            console.log("socket已经关闭")
+        },
+        addChatMessage: function(user_id,msg,datetime) {
+            this.messages.push(msg+"("+datetime+")")
+        },
+        addSystemMessage: function(event_type,user) {
+         if(event_type==="system_msg_user_login"){
+            this.messages.push("系统消息：用户"+ user.username +"加入到聊天室中")
+         }
+         else if(event_type==="system_msg_user_logout"){
+            this.messages.push("系统消息：用户"+ user.username +"离开了聊天室")
+         }
+         console.log(user)
+        }
+    },
+    destroyed () {
+        // 销毁监听
+        this.socket.onclose = this.close
+    },
+    })
+
+</script>
+
+</body>
+</html>
